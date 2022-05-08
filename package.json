@@ -1,6 +1,6 @@
 {
-  "name": "node-gyp-build",
-  "version": "4.3.0",
+  "name": "node-gyp-build-optional-packages",
+  "version": "4.3.1",
   "description": "Build tool and bindings loader for node-gyp that supports prebuilds",
   "main": "index.js",
   "devDependencies": {
@@ -12,7 +12,7 @@
     "test": "standard && node test"
   },
   "bin": {
-    "node-gyp-build": "./bin.js",
+    "node-gyp-build-optional-packages": "./bin.js",
     "node-gyp-build-optional": "./optional.js",
     "node-gyp-build-test": "./build-test.js"
   },
