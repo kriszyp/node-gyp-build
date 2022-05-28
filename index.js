@@ -43,7 +43,7 @@ load.path = function (dir) {
   var nearby = resolve(path.dirname(process.execPath))
   if (nearby) return nearby
 
-  var platformPackage = (packageName[0] == '@' ? '' : '@' + packageName + '/') + packageName + '-' + platform + '-' + arch
+  var platformPackage = packageName + '-' + platform + '-' + arch
   try {
     var prebuildPackage = path.dirname(require('module').createRequire(path.join(dir, 'package.json')).resolve(platformPackage))
     return resolveFile(prebuildPackage)
