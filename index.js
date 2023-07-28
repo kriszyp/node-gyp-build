@@ -31,7 +31,7 @@ function load (dir) {
 
 load.path = function (dir) {
   dir = path.resolve(dir || '.')
-  var packageName
+  var packageName = ''
   try {
     // explanation above
     if (typeof __webpack_require__ === 'function')
@@ -74,7 +74,8 @@ load.path = function (dir) {
     typeof __webpack_require__ === 'function' ? 'webpack=true' : '' // eslint-disable-line
   ].filter(Boolean).join(' ')
 
-  throw new Error('No native build was found for ' + target + '\n    loaded from: ' + dir + ' and package: ' + platformPackage + '\n')
+  throw new Error('No native build was found for ' + target + '\n    attempted loading from: ' + dir + ' and package:' +
+     ' ' + platformPackage + '\n')
 
   function resolve (dir) {
     // Find matching "prebuilds/<platform>-<arch>" directory
