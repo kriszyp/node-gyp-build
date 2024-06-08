@@ -32,6 +32,7 @@ function load (dir) {
 load.path = function (dir) {
   dir = path.resolve(dir || '.')
   var packageName = ''
+  var packageNameError
   try {
     // explanation above
     if (typeof __webpack_require__ === 'function')
@@ -40,7 +41,9 @@ load.path = function (dir) {
       packageName = require(path.join(dir, 'package.json')).name
     var varName = packageName.toUpperCase().replace(/-/g, '_') + '_PREBUILD'
     if (process.env[varName]) dir = process.env[varName]
-  } catch (err) {}
+  } catch (err) {
+    packageNameError = err;
+  }
   if (!prebuildsOnly) {
     var release = getFirst(path.join(dir, 'build/Release'), matchBuild)
     if (release) return release
@@ -56,10 +59,13 @@ load.path = function (dir) {
   if (nearby) return nearby
 
   var platformPackage = (packageName[0] == '@' ? '' : '@' + packageName + '/') + packageName + '-' + platform + '-' + arch
+  var packageResolutionError
   try {
     var prebuildPackage = path.dirname(require('module').createRequire(url.pathToFileURL(path.join(dir, 'package.json'))).resolve(platformPackage))
     return resolveFile(prebuildPackage)
-  } catch(error) {}
+  } catch(error) {
+    packageResolutionError = error
+  }
 
   var target = [
     'platform=' + platform,
@@ -73,9 +79,15 @@ load.path = function (dir) {
     process.versions.electron ? 'electron=' + process.versions.electron : '',
     typeof __webpack_require__ === 'function' ? 'webpack=true' : '' // eslint-disable-line
   ].filter(Boolean).join(' ')
-
-  throw new Error('No native build was found for ' + target + '\n    attempted loading from: ' + dir + ' and package:' +
-     ' ' + platformPackage + '\n')
+  let errMessage = 'No native build was found for ' + target + '\n    attempted loading from: ' + dir + ' and package:' +
+    ' ' + platformPackage + '\n';
+  if (packageNameError) {
+    errMessage += 'Error finding package.json: ' + packageNameError.message + '\n';
+  }
+  if (packageResolutionError) {
+    errMessage += 'Error resolving package: ' + packageResolutionError.message + '\n';
+  }
+  throw new Error(errMessage)
 
   function resolve (dir) {
     // Find matching "prebuilds/<platform>-<arch>" directory
