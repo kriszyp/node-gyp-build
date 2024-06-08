@@ -1,20 +1,26 @@
 var fs = require('fs')
 var path = require('path')
+var url = require('url')
 var os = require('os')
-
 // Workaround to fix webpack's build warnings: 'the request of a dependency is an expression'
 var runtimeRequire = typeof __webpack_require__ === 'function' ? __non_webpack_require__ : require // eslint-disable-line
 
 var vars = (process.config && process.config.variables) || {}
 var prebuildsOnly = !!process.env.PREBUILDS_ONLY
-var abi = process.versions.modules // TODO: support old node where this is undef
+var versions = process.versions
+var abi = versions.modules
+if (versions.deno || process.isBun) {
+  // both Deno and Bun made the very poor decision to shoot themselves in the foot and lie about support for ABI
+  // (which they do not have)
+  abi = 'unsupported'
+}
 var runtime = isElectron() ? 'electron' : (isNwjs() ? 'node-webkit' : 'node')
-
 var arch = process.env.npm_config_arch || os.arch()
 var platform = process.env.npm_config_platform || os.platform()
-var libc = process.env.LIBC || (isAlpine(platform) ? 'musl' : 'glibc')
+var libc = process.env.LIBC || (isMusl(platform) ? 'musl' : 'glibc')
+
 var armv = process.env.ARM_VERSION || (arch === 'arm64' ? '8' : vars.arm_version) || ''
-var uv = (process.versions.uv || '').split('.')[0]
+var uv = (versions.uv || '').split('.')[0]
 
 module.exports = load
 
@@ -24,12 +30,14 @@ function load (dir) {
 
 load.resolve = load.path = function (dir) {
   dir = path.resolve(dir || '.')
-
+  var packageName = ''
+  var packageNameError
   try {
     var name = runtimeRequire(path.join(dir, 'package.json')).name.toUpperCase().replace(/-/g, '_')
     if (process.env[name + '_PREBUILD']) dir = process.env[name + '_PREBUILD']
-  } catch (err) {}
-
+  } catch (err) {
+    packageNameError = err;
+  }
   if (!prebuildsOnly) {
     var release = getFirst(path.join(dir, 'build/Release'), matchBuild)
     if (release) return release
@@ -44,6 +52,15 @@ load.resolve = load.path = function (dir) {
   var nearby = resolve(path.dirname(process.execPath))
   if (nearby) return nearby
 
+  var platformPackage = (packageName[0] == '@' ? '' : '@' + packageName + '/') + packageName + '-' + platform + '-' + arch
+  var packageResolutionError
+  try {
+    var prebuildPackage = path.dirname(require('module').createRequire(url.pathToFileURL(path.join(dir, 'package.json'))).resolve(platformPackage))
+    return resolveFile(prebuildPackage)
+  } catch(error) {
+    packageResolutionError = error
+  }
+
   var target = [
     'platform=' + platform,
     'arch=' + arch,
@@ -56,17 +73,25 @@ load.resolve = load.path = function (dir) {
     process.versions.electron ? 'electron=' + process.versions.electron : '',
     typeof __webpack_require__ === 'function' ? 'webpack=true' : '' // eslint-disable-line
   ].filter(Boolean).join(' ')
-
-  throw new Error('No native build was found for ' + target + '\n    loaded from: ' + dir + '\n')
+  let errMessage = 'No native build was found for ' + target + '\n    attempted loading from: ' + dir + ' and package:' +
+    ' ' + platformPackage + '\n';
+  if (packageNameError) {
+    errMessage += 'Error finding package.json: ' + packageNameError.message + '\n';
+  }
+  if (packageResolutionError) {
+    errMessage += 'Error resolving package: ' + packageResolutionError.message + '\n';
+  }
+  throw new Error(errMessage)
 
   function resolve (dir) {
     // Find matching "prebuilds/<platform>-<arch>" directory
     var tuples = readdirSync(path.join(dir, 'prebuilds')).map(parseTuple)
     var tuple = tuples.filter(matchTuple(platform, arch)).sort(compareTuples)[0]
     if (!tuple) return
-
+    return resolveFile(path.join(dir, 'prebuilds', tuple.name))
+  }
+  function resolveFile (prebuilds) {
     // Find most specific flavor first
-    var prebuilds = path.join(dir, 'prebuilds', tuple.name)
     var parsed = readdirSync(prebuilds).map(parseTags)
     var candidates = parsed.filter(matchTags(runtime, abi))
     var winner = candidates.sort(compareTags(runtime))[0]
@@ -154,8 +179,8 @@ function parseTags (file) {
 function matchTags (runtime, abi) {
   return function (tags) {
     if (tags == null) return false
-    if (tags.runtime && tags.runtime !== runtime && !runtimeAgnostic(tags)) return false
-    if (tags.abi && tags.abi !== abi && !tags.napi) return false
+    if (tags.runtime !== runtime && !runtimeAgnostic(tags)) return false
+    if (tags.abi !== abi && !tags.napi) return false
     if (tags.uv && tags.uv !== uv) return false
     if (tags.armv && tags.armv !== armv) return false
     if (tags.libc && tags.libc !== libc) return false
@@ -183,18 +208,16 @@ function compareTags (runtime) {
   }
 }
 
-function isNwjs () {
-  return !!(process.versions && process.versions.nw)
-}
-
 function isElectron () {
   if (process.versions && process.versions.electron) return true
   if (process.env.ELECTRON_RUN_AS_NODE) return true
   return typeof window !== 'undefined' && window.process && window.process.type === 'renderer'
 }
 
-function isAlpine (platform) {
-  return platform === 'linux' && fs.existsSync('/etc/alpine-release')
+function isMusl (platform) {
+  if (platform !== 'linux') return false;
+  const { familySync, MUSL } = require('detect-libc');
+  return familySync() === MUSL;
 }
 
 // Exposed for unit tests
@@ -205,3 +228,4 @@ load.compareTags = compareTags
 load.parseTuple = parseTuple
 load.matchTuple = matchTuple
 load.compareTuples = compareTuples
+
