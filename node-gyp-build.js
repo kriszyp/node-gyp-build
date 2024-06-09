@@ -208,6 +208,10 @@ function compareTags (runtime) {
   }
 }
 
+function isNwjs () {
+  return !!(process.versions && process.versions.nw)
+}
+
 function isElectron () {
   if (process.versions && process.versions.electron) return true
   if (process.env.ELECTRON_RUN_AS_NODE) return true
