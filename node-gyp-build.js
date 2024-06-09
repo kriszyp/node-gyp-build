@@ -33,8 +33,9 @@ load.resolve = load.path = function (dir) {
   var packageName = ''
   var packageNameError
   try {
-    var name = runtimeRequire(path.join(dir, 'package.json')).name.toUpperCase().replace(/-/g, '_')
-    if (process.env[name + '_PREBUILD']) dir = process.env[name + '_PREBUILD']
+    packageName = runtimeRequire(path.join(dir, 'package.json')).name;
+    var varName = packageName.toUpperCase().replace(/-/g, '_')
+    if (process.env[varName + '_PREBUILD']) dir = process.env[varName + '_PREBUILD']
   } catch (err) {
     packageNameError = err;
   }
