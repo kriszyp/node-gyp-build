@@ -21,12 +21,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/prebuild/node-gyp-build.git"
+    "url": "https://github.com/kriszyp/node-gyp-build.git#ngbop"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/prebuild/node-gyp-build/issues"
+    "url": "https://github.com/kriszyp/node-gyp-build/issues"
   },
-  "homepage": "https://github.com/prebuild/node-gyp-build"
+  "homepage": "https://github.com/kriszyp/node-gyp-build"
 }
